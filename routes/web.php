@@ -11,8 +11,8 @@
 |
 */
 
-$router->get('/', function () use ($router) {
-    return $router->app->version();
+$router->get('/', function () {
+    return view('yearSelection');
 });
 
-$router->get('/lastDate/{year}', 'yearController@getPayDays');
+$router->get('/lastDate/{year}[/{outputType}]', 'yearController@getPayDays');

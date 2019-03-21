@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Http\Request;
+use DateTime;
 
 class YearController extends Controller
 {
@@ -14,7 +16,7 @@ class YearController extends Controller
     public function __construct()
     {}
 
-    public function getPayDays($year) {
+    public function getPayDays($year, $outputType = 'csv') {
         $yearMonths = [];
         $payDays    = [];
         $bonusDays  = [];
@@ -45,36 +47,47 @@ class YearController extends Controller
                     break;
             }
         }
+
+        if ($outputType === 'json') {
+            return response()->json(['year' => $year, 'payDays' => $payDays, 'bonusDays' => $bonusDays]);
+        }
+
         $headers = $this->getFileResponseHeaders($year.'.csv');
         $columns = ["month", "Payday", "Bonus Payday"];
 
         return $this->streamFile(function () use ($payDays, $bonusDays, $columns) {
-            $csv = fopen('php://output', 'w');
-            fputcsv($csv, $columns);
+            $output = fopen('php://output', 'w');
+            fputcsv($output, $columns);
 
             foreach ($payDays as $key => $payday) {
                 $dateObj   = DateTime::createFromFormat('!m', $key + 1);
                 $monthName = $dateObj->format('F');
-                fputcsv($csv, [$monthName, $payday, $bonusDays[$key]]);
+                fputcsv($output, [
+                    $monthName, 
+                    date('d/m/Y', strtotime($payday)), 
+                    date('d/m/Y', strtotime($bonusDays[$key]))
+                    ]);
             }
             fclose($output);
         }, $headers);
     }
 
     protected function streamFile($callback, $headers)
-    {
-        $response = new StreamedResponse($callback, 200, $headers);
-        $response->send();
+    {   
+        try {
+            $response = new StreamedResponse($callback, 200, $headers);
+            $response->send();
+        }
+        catch(Exception $e) {
+            var_dump($e);
+        }
     }
 
     protected function getFileResponseHeaders($filename)
     {
         return [
-            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
-            'Content-type'        => 'text/csv',
+            'Content-Type'        => 'text/csv',
             'Content-Disposition' => 'attachment; filename='.$filename,
-            'Expires'             => '0',
-            'Pragma'              => 'public'
         ];
     }
 }
